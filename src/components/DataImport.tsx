@@ -58,7 +58,7 @@ export function DataImport({ onDataImport, onClose, onFileNameUpdate }: DataImpo
       const response = await fetch(urlInput);
       const data = await response.json();
       
-      if (Array.isArray(data)) {
+     // if (Array.isArray(data)) {
         const urlParts = urlInput.split('/');
         const filename = urlParts[urlParts.length - 1] || 'imported-data.json';
         onFileNameUpdate(filename);
@@ -66,9 +66,11 @@ export function DataImport({ onDataImport, onClose, onFileNameUpdate }: DataImpo
         const processedData = await processJsonData(data);
         onDataImport([{ name: filename, data: processedData }]);
         onClose();
+      /*
       } else {
         alert('Invalid data format. URL must return a JSON array.');
       }
+      */
     } catch (error) {
       console.error('Error fetching data:', error);
       alert('Error fetching data from URL. Please check the URL and try again.');
