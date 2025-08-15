@@ -63,7 +63,11 @@ export function DataImport({ onDataImport, onClose, onFileNameUpdate }: DataImpo
         const filename = urlParts[urlParts.length - 1] || 'imported-data.json';
         onFileNameUpdate(filename);
         
-        const processedData = await processJsonData(data);
+//        const processedData = await processHarData(data);
+       let processedData;
+       if (data.log && data.log.entries) {
+           processedData = await processHarData(data);
+       }
         onDataImport([{ name: filename, data: processedData }]);
         onClose();
       /*
