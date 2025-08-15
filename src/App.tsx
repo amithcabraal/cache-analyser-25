@@ -11,6 +11,7 @@ import { NetworkRequest, Filter, PanelConfig, DataFile } from './types';
 import { filterData } from './utils/filters';
 import { useUrlState } from './hooks/useUrlState';
 import { createDataZip } from './utils/fileProcessor';
+import { processHarData } from './utils/fileProcessor';
 
 const defaultPanels: PanelConfig[] = [
   { i: 'time-series-requests', x: 0, y: 0, w: 12, h: 2, type: 'time-series-requests' },
@@ -40,6 +41,7 @@ export function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [filename, setFilename] = useState('network-analysis');
+  const [isAutoLoading, setIsAutoLoading] = useState(false);
 
   useEffect(() => {
     if (files.length > 0 && currentFileIndex >= 0 && currentFileIndex < files.length) {
@@ -49,6 +51,67 @@ export function App() {
     }
   }, [files, currentFileIndex, filters]);
 
+  // Auto-load data from URL query parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const loadURL = urlParams.get('loadURL');
+    
+    if (loadURL && files.length === 0 && !isAutoLoading) {
+      setIsAutoLoading(true);
+      setShowImport(false); // Hide import dialog while auto-loading
+      
+      const autoLoadData = async () => {
+        try {
+          const response = await fetch(loadURL);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          
+          // Extract filename from URL
+          const urlParts = loadURL.split('/');
+          const filename = urlParts[urlParts.length - 1] || 'auto-loaded-data.json';
+          
+          let processedData: NetworkRequest[];
+          if (data.log && data.log.entries) {
+            processedData = await processHarData(data);
+          } else if (Array.isArray(data)) {
+            // Handle JSON array format - assume it's already processed
+            processedData = data.map(entry => ({
+              ...entry,
+              "9.timestamp": entry["9.timestamp"] || Date.now(),
+              "parsed.cache-control": entry["parsed.cache-control"] || {},
+              "parsed.cache-used": entry["parsed.cache-used"] || 'uncached'
+            }));
+          } else {
+            throw new Error('Invalid data format. Expected HAR file or JSON array.');
+          }
+
+          setFiles([{ name: filename, data: processedData }]);
+          setCurrentFileIndex(0);
+          
+          // Remove the loadURL parameter from the URL to prevent re-loading
+          urlParams.delete('loadURL');
+          const newSearch = urlParams.toString();
+          window.history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`
+          );
+          
+        } catch (error) {
+          console.error('Error auto-loading data:', error);
+          alert(`Error loading data from URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          setShowImport(true); // Show import dialog on error
+        } finally {
+          setIsAutoLoading(false);
+        }
+      };
+      
+      autoLoadData();
+    }
+  }, [files.length, isAutoLoading]);
   useEffect(() => {
     localStorage.setItem('dashboardLayout', JSON.stringify(panels));
   }, [panels]);
@@ -191,13 +254,24 @@ export function App() {
 
       <Container maxWidth={false}>
         <Box sx={{ my: 4 }}>
-          {showImport ? (
+          {showImport && !isAutoLoading ? (
             <Paper sx={{ p: 2, mb: 2 }}>
               <DataImport
                 onDataImport={handleDataImport}
                 onClose={() => setShowImport(false)}
                 onFileNameUpdate={() => {}}
               />
+            </Paper>
+          ) : isAutoLoading ? (
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="h6" gutterBottom>
+                  Loading data from URL...
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Please wait while we fetch and process your data.
+                </Typography>
+              </Box>
             </Paper>
           ) : (
             <>
