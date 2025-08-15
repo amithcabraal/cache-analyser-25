@@ -64,12 +64,11 @@ export function DataImport({ onDataImport, onClose, onFileNameUpdate }: DataImpo
         onFileNameUpdate(filename);
         
 //        const processedData = await processHarData(data);
-       let processedData;
        if (data.log && data.log.entries) {
-           processedData = await processHarData(data);
+           const processedData = await processHarData(data);
+           onDataImport([{ name: filename, data: processedData }]);
+           onClose();
        }
-        onDataImport([{ name: filename, data: processedData }]);
-        onClose();
       /*
       } else {
         alert('Invalid data format. URL must return a JSON array.');
